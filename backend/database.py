@@ -7,7 +7,9 @@ Stores tenders and bidder evaluation results for audit trail.
 import sqlite3
 from datetime import datetime
 
-DB_PATH = "tendershield.db"
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH  = os.path.join(BASE_DIR, "tendershield.db")
 
 
 def get_connection():
