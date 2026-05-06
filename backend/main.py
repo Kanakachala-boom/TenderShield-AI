@@ -1,10 +1,10 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from . import database
-from .ocr_engine import extract_text_from_pdf
-from .nlp_engine import extract_rules
-from .evaluator import evaluate_bidder
-from .fraud_detector import detect_fraud
+import database
+from ocr_engine import extract_text_from_pdf
+from nlp_engine import extract_rules
+from evaluator import evaluate_bidder
+from fraud_detector import detect_fraud
 import shutil, os, json
 
 app = FastAPI(title="TenderShield AI", version="1.0.0")
@@ -179,7 +179,7 @@ async def upload_bidder(file: UploadFile = File(...)):
         text = extract_text_from_pdf(file_path)
         
         # 2. Extract Bidder JSON using LLM (Upgrade #4)
-        from .nlp_engine import extract_bidder_info_llm
+        from nlp_engine import extract_bidder_info_llm
         bidder_data = extract_bidder_info_llm(text)
         
         # Ensure minimum fields
