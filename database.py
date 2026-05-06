@@ -9,7 +9,10 @@ from datetime import datetime
 
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH  = os.path.join(BASE_DIR, "tendershield.db")
+# Ensure root version points to the backend folder for the database
+DB_PATH  = os.path.join(BASE_DIR, "backend", "tendershield.db")
+if not os.path.exists(os.path.join(BASE_DIR, "backend")):
+    DB_PATH = os.path.join(BASE_DIR, "tendershield.db")
 
 
 def get_connection():
