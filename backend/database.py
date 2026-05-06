@@ -138,5 +138,16 @@ def get_bidders_for_tender(tender_id: int) -> list:
     return [dict(r) for r in rows]
 
 
+def delete_tender(tender_id: int):
+    """Delete a tender and all its associated data (logs, bidders) from the database."""
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM audit_log WHERE tender_id=?", (tender_id,))
+    c.execute("DELETE FROM bidders WHERE tender_id=?", (tender_id,))
+    c.execute("DELETE FROM tenders WHERE id=?", (tender_id,))
+    conn.commit()
+    conn.close()
+
+
 # Auto-create tables when this module is imported
 create_tables()

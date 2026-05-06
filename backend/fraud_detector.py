@@ -53,11 +53,11 @@ def run_all_fraud_checks(bidder, all_bidders: list) -> list:
 
 def _check_experience_inflation(bidder: dict) -> list:
     flags = []
-    turnover   = _get(bidder, "turnover", 0)
-    experience = _get(bidder, "experience", 0) or _get(bidder, "years_experience", 0)
+    turnover   = _get_num(bidder, "turnover", 0)
+    experience = _get_num(bidder, "experience", 0) or _get_num(bidder, "years_experience", 0)
 
     # High turnover but almost no experience → suspicious
-    if turnover > 50_000_000 and experience < 2:
+    if turnover > 50000000 and experience < 2:
         flags.append({
             "type":        "experience_inflation",
             "severity":    "high",
@@ -72,7 +72,7 @@ def _check_experience_inflation(bidder: dict) -> list:
         })
 
     # High experience but near-zero turnover → dormant/shell
-    if experience > 10 and turnover < 1_000_000:
+    if experience > 10 and turnover < 1000000:
         flags.append({
             "type":        "dormant_entity",
             "severity":    "medium",
@@ -205,16 +205,16 @@ def _check_collusion(bidder: dict, all_bidders: list) -> list:
 
 def _check_underbidding(bidder: dict, all_bidders: list) -> list:
     flags = []
-    my_bid = _get(bidder, "bid_amount", 0)
+    my_bid = _get_num(bidder, "bid_amount", 0)
     if not my_bid or my_bid <= 0:
         return flags
 
     # Compute average bid of all others
     other_bids = [
-        _get(b, "bid_amount", 0) for b in all_bidders
+        _get_num(b, "bid_amount", 0) for b in all_bidders
         if (_get(b, "name","") or _get(b,"company_name","")) !=
            (_get(bidder,"name","") or _get(bidder,"company_name",""))
-        and _get(b, "bid_amount", 0) > 0
+        and _get_num(b, "bid_amount", 0) > 0
     ]
 
     if not other_bids:
@@ -352,6 +352,14 @@ def _get(obj, key, default):
     if isinstance(obj, dict):
         return obj.get(key, default)
     return getattr(obj, key, default)
+
+def _get_num(obj, key, default=0):
+    """Safe numeric getter that handles string conversion."""
+    val = _get(obj, key, default)
+    try:
+        return float(val) if val is not None else float(default)
+    except (ValueError, TypeError):
+        return float(default)
 
 
 def _same_subnet(ip1: str, ip2: str) -> bool:

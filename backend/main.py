@@ -43,7 +43,7 @@ async def upload_tender(file: UploadFile = File(...)):
 
         # OCR Phase
         text  = extract_text_from_pdf(file_path)
-        # NLP Rule Structuring Phase[cite: 3, 4]
+        # NLP Rule Structuring Phase
         rules = extract_rules(text)
 
         # Database Integration (Upgrade #1)
@@ -71,7 +71,7 @@ def evaluate(data: dict):
     return evaluate_bidder(bidder, rules)
 
 
-# ── Leaderboard: Ranks bidders and detects anomalies[cite: 3, 4] ───────────────
+# ── Leaderboard: Ranks bidders and detects anomalies ───────────────
 @app.post("/leaderboard/")
 def leaderboard(data: dict):
     bidders = data.get("bidders", [])
@@ -80,55 +80,62 @@ def leaderboard(data: dict):
     if not bidders:
         raise HTTPException(status_code=400, detail="No bidders provided")
 
-    results = []
-    for bidder in bidders:
-        # Core Matching Engine
-        result = evaluate_bidder(bidder, rules)
-        # Risk & Anomaly Scoring Engine[cite: 4]
-        fraud  = detect_fraud(bidder, rules)
+    try:
+        results = []
+        for bidder in bidders:
+            # Core Matching Engine
+            result = evaluate_bidder(bidder, rules)
+            # Risk & Anomaly Scoring Engine
+            fraud  = detect_fraud(bidder, rules)
 
-        # Mapping status for React frontend 'statusColor' and 'statusBg'[cite: 3]
-        status_map = {"eligible": "Qualified", "rejected": "Rejected", "review": "Review"}
-        display_status = status_map.get(result["status"], result["status"].title())
+            # Mapping status
+            status_map = {"eligible": "Qualified", "rejected": "Rejected", "review": "Review"}
+            display_status = status_map.get(result["status"], result["status"].title())
 
-        # Risk logic aligns with Frontend 'riskColor'[cite: 3]
-        has_high = any(f.get("severity") == "high" for f in fraud.get("details", []))
-        risk = "High" if (fraud.get("is_suspicious") and has_high) else \
-               "Medium" if fraud.get("is_suspicious") else "Low"
+            # Risk logic
+            has_high = any(f.get("severity") == "high" for f in fraud.get("details", []))
+            risk = "High" if (fraud.get("is_suspicious") and has_high) else \
+                   "Medium" if fraud.get("is_suspicious") else "Low"
 
-        # Penalize score based on risk
-        final_score = result.get("total_score", result.get("score", 0))
-        if risk == "High":
-            display_status = "Rejected"
-            final_score = max(0, final_score - 50)
-        elif risk == "Medium":
-            final_score = max(0, final_score - 20)
+            # Penalize score based on risk
+            final_score = result.get("total_score", result.get("score", 0))
+            if risk == "High":
+                display_status = "Rejected"
+                final_score = max(0, float(final_score or 0) - 50)
+            elif risk == "Medium":
+                final_score = max(0, float(final_score or 0) - 20)
 
-        results.append({
-            "name":       bidder.get("name", "Unknown"),
-            "score":      round(final_score, 1),
-            "experience": bidder.get("experience", 0),
-            "status":     display_status,
-            "details":    result.get("details", []),
-            "risk":       risk,
-            "flags":      fraud.get("flags", []),
-            "confidence": min(95, int(result.get("score", 0))),
-            "explanation": result.get("explanation", "")
-        })
+            results.append({
+                "name":       bidder.get("name", "Unknown"),
+                "score":      round(float(final_score or 0), 1),
+                "experience": int(bidder.get("experience", 0)),
+                "turnover":   float(bidder.get("turnover", 0)),
+                "bid_amount": float(bidder.get("bid_amount", 0)),
+                "status":     display_status,
+                "details":    result.get("details", []),
+                "risk":       risk,
+                "flags":      fraud.get("flags", []),
+                "fraud_details": fraud.get("details", []),
+                "confidence": min(95, int(float(result.get("score", 0)))),
+                "explanation": result.get("explanation", "")
+            })
 
-    # Ranking logic for the Leaderboard Tab[cite: 3]
-    results.sort(
-        key=lambda x: (x["status"] == "Qualified", x["score"], x["experience"]),
-        reverse=True
-    )
+        # Ranking logic
+        results.sort(
+            key=lambda x: (x["status"] == "Qualified", x["score"], x["experience"]),
+            reverse=True
+        )
 
-    # Database Integration (Upgrade #1)
-    if tender_id:
-        for res in results:
-            database.save_bidder_result(tender_id, res)
-        database.log_action(tender_id, "LEADERBOARD_GENERATED", f"Evaluated and ranked {len(bidders)} bidders.")
+        # Database Integration
+        if tender_id:
+            for res in results:
+                database.save_bidder_result(tender_id, res)
+            database.log_action(tender_id, "LEADERBOARD_GENERATED", f"Evaluated and ranked {len(bidders)} bidders.")
 
-    return results
+        return results
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ── Audit Trail API (Upgrade #2) ──────────────────────────────────────────────
@@ -148,6 +155,11 @@ def get_all_tenders():
 @app.get("/tenders/{tender_id}/bidders")
 def get_bidders_for_tender(tender_id: int):
     return database.get_bidders_for_tender(tender_id)
+
+@app.delete("/tenders/{tender_id}")
+def delete_tender(tender_id: int):
+    database.delete_tender(tender_id)
+    return {"message": "Tender and all associated data deleted successfully."}
 
 
 # ── Bidder Document Parsing (Upgrade #4) ──────────────────────────────────────
@@ -181,4 +193,4 @@ async def upload_bidder(file: UploadFile = File(...)):
             "bidder_data": bidder_data
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
